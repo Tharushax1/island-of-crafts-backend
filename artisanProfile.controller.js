@@ -51,7 +51,6 @@ exports.updateProfile = async (req, res) => {
       if (req.body[field] !== undefined) profile[field] = req.body[field];
     });
 
-    // storeName changes regenerate the slug
     if (req.body.storeName && req.body.storeName !== profile.storeName) {
       profile.storeName = req.body.storeName;
       profile.storeSlug = toSlug(req.body.storeName);
@@ -61,6 +60,19 @@ exports.updateProfile = async (req, res) => {
     res.json(profile);
   } catch (err) {
     res.status(500).json({ message: 'Failed to update profile', error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// LIST ALL — GET /api/artisans
+// Public directory of all artisan storefronts, for the "Artisans" nav tab.
+// ─────────────────────────────────────────────
+exports.getAllProfiles = async (req, res) => {
+  try {
+    const profiles = await ArtisanProfile.find().sort({ createdAt: -1 });
+    res.json(profiles);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch artisans', error: err.message });
   }
 };
 
