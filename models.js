@@ -102,9 +102,187 @@ const customRequestSchema = new Schema({
   convertedOrder: { type: Schema.Types.ObjectId, ref: 'Order', default: null },
 }, { timestamps: true });
 
+// ─────────────────────────────────────────────
+// 5. CART
+// One cart per customer
+// Supports products from multiple artisans
+// ─────────────────────────────────────────────
+const cartItemSchema = new Schema({
+  product: {
+    type: Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+  },
+
+  artisan: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+}, { _id: true });
+
+const cartSchema = new Schema({
+  customer: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true,
+  },
+
+  items: [cartItemSchema],
+
+}, { timestamps: true });
+
+
+// ─────────────────────────────────────────────
+// 6. ORDER
+// One checkout creates one order.
+// The order can contain products from multiple artisans.
+// ─────────────────────────────────────────────
+const orderItemSchema = new Schema({
+  product: {
+    type: Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+  },
+
+  artisan: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+
+  productName: {
+    type: String,
+    required: true,
+  },
+
+  price: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+
+  subtotal: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+
+}, { _id: true });
+
+
+const orderSchema = new Schema({
+  customer: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+
+  orderNumber: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  items: {
+    type: [orderItemSchema],
+    validate: {
+      validator: (items) => items.length > 0,
+      message: 'Order must contain at least one item',
+    },
+  },
+
+  shippingAddress: {
+    fullName: {
+      type: String,
+      required: true,
+    },
+
+    phone: {
+      type: String,
+      required: true,
+    },
+
+    address: {
+      type: String,
+      required: true,
+    },
+
+    city: {
+      type: String,
+      required: true,
+    },
+
+    postalCode: {
+      type: String,
+      required: true,
+    },
+  },
+
+  subtotal: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+
+  deliveryFee: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0,
+  },
+
+  total: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'pending',
+  },
+
+  status: {
+    type: String,
+    enum: [
+      'pending',
+      'confirmed',
+      'processing',
+      'shipped',
+      'delivered',
+      'cancelled',
+    ],
+    default: 'pending',
+  },
+
+  customRequest: {
+    type: Schema.Types.ObjectId,
+    ref: 'CustomRequest',
+    default: null,
+  },
+
+}, { timestamps: true });
+
 module.exports = {
   Category: mongoose.model('Category', categorySchema),
   Product: mongoose.model('Product', productSchema),
   ArtisanProfile: mongoose.model('ArtisanProfile', artisanProfileSchema),
   CustomRequest: mongoose.model('CustomRequest', customRequestSchema),
+   Cart: mongoose.model('Cart', cartSchema),
+  Order: mongoose.model('Order', orderSchema),
 };
