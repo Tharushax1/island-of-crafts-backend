@@ -312,13 +312,13 @@ exports.createPayHerePayment = async (req, res) => {
         merchant_id: merchantId,
 
         return_url:
-          process.env.PAYHERE_RETURN_URL,
+          `${process.env.FRONTEND_URL}/payment-success/${order.orderNumber}`,
 
         cancel_url:
-          process.env.PAYHERE_CANCEL_URL,
+          `${process.env.FRONTEND_URL}/checkout`,
 
         notify_url:
-          process.env.PAYHERE_NOTIFY_URL,
+          `${process.env.BACKEND_URL}/api/orders/payhere/notify`,
 
         first_name: firstName,
         last_name: lastName,
