@@ -44,9 +44,9 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    if (paymentMethod !== 'cash_on_delivery') {
+    if (!['cash_on_delivery', 'payhere'].includes(paymentMethod)) {
       return res.status(400).json({
-        message: 'Selected payment method is not available',
+         message: 'Selected payment method is not available',
       });
     }
 
@@ -220,6 +220,288 @@ exports.getOrder = async (req, res) => {
     res.status(500).json({
       message: 'Failed to fetch order',
       error: err.message,
+    });
+  }
+};
+
+const crypto = require('crypto');
+
+
+// ==========================================
+// CREATE PAYHERE PAYMENT DATA
+// GET /api/orders/:orderNumber/payhere
+// ==========================================
+
+exports.createPayHerePayment = async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      orderNumber: req.params.orderNumber,
+      customer: req.user._id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    if (order.paymentMethod !== 'payhere') {
+      return res.status(400).json({
+        message: 'This order is not a PayHere order',
+      });
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return res.status(400).json({
+        message: 'Order is already paid',
+      });
+    }
+
+    const merchantId =
+      process.env.PAYHERE_MERCHANT_ID;
+
+    const merchantSecret =
+      process.env.PAYHERE_MERCHANT_SECRET;
+
+    if (!merchantId || !merchantSecret) {
+      return res.status(500).json({
+        message: 'PayHere configuration is missing',
+      });
+    }
+
+    const amount =
+      Number(order.total).toFixed(2);
+
+    const currency = 'LKR';
+
+    const hashedSecret = crypto
+      .createHash('md5')
+      .update(merchantSecret)
+      .digest('hex')
+      .toUpperCase();
+
+    const hash = crypto
+      .createHash('md5')
+      .update(
+        merchantId +
+        order.orderNumber +
+        amount +
+        currency +
+        hashedSecret
+      )
+      .digest('hex')
+      .toUpperCase();
+
+    const fullName =
+      order.shippingAddress.fullName.trim();
+
+    const nameParts =
+      fullName.split(/\s+/);
+
+    const firstName =
+      nameParts[0] || 'Customer';
+
+    const lastName =
+      nameParts.slice(1).join(' ') || 'Customer';
+
+    res.json({
+      action:
+        'https://sandbox.payhere.lk/pay/checkout',
+
+      payment: {
+        merchant_id: merchantId,
+
+        return_url:
+          process.env.PAYHERE_RETURN_URL,
+
+        cancel_url:
+          process.env.PAYHERE_CANCEL_URL,
+
+        notify_url:
+          process.env.PAYHERE_NOTIFY_URL,
+
+        first_name: firstName,
+        last_name: lastName,
+
+        email:
+          order.customerEmail || 'customer@example.com',
+
+        phone:
+          order.shippingAddress.phone,
+
+        address:
+          order.shippingAddress.address,
+
+        city:
+          order.shippingAddress.city,
+
+        country: 'Sri Lanka',
+
+        order_id:
+          order.orderNumber,
+
+        items:
+          `Island of Crafts Order ${order.orderNumber}`,
+
+        currency,
+
+        amount,
+
+        hash,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      'Create PayHere payment error:',
+      error
+    );
+
+    res.status(500).json({
+      message:
+        'Failed to prepare PayHere payment',
+      error: error.message,
+    });
+  }
+};
+
+
+// ==========================================
+// PAYHERE NOTIFICATION
+// POST /api/orders/payhere/notify
+// ==========================================
+
+exports.payHereNotify = async (req, res) => {
+  try {
+    const {
+      merchant_id,
+      order_id,
+      payment_id,
+      payhere_amount,
+      payhere_currency,
+      status_code,
+      md5sig,
+    } = req.body;
+
+    const merchantSecret =
+      process.env.PAYHERE_MERCHANT_SECRET;
+
+    if (!merchantSecret) {
+      return res.status(500).send('Configuration error');
+    }
+
+    const hashedSecret = crypto
+      .createHash('md5')
+      .update(merchantSecret)
+      .digest('hex')
+      .toUpperCase();
+
+    const localMd5sig = crypto
+      .createHash('md5')
+      .update(
+        merchant_id +
+        order_id +
+        payhere_amount +
+        payhere_currency +
+        status_code +
+        hashedSecret
+      )
+      .digest('hex')
+      .toUpperCase();
+
+    if (localMd5sig !== md5sig) {
+      console.error(
+        'Invalid PayHere signature'
+      );
+
+      return res
+        .status(400)
+        .send('Invalid signature');
+    }
+
+    const order =
+      await Order.findOne({
+        orderNumber: order_id,
+      });
+
+    if (!order) {
+      return res
+        .status(404)
+        .send('Order not found');
+    }
+
+    // 2 = successful payment
+    if (String(status_code) === '2') {
+
+      order.paymentStatus = 'paid';
+
+      order.payherePaymentId =
+        payment_id;
+
+      await order.save();
+
+    } else if (
+      ['-1', '-2', '-3'].includes(
+        String(status_code)
+      )
+    ) {
+
+      order.paymentStatus = 'failed';
+
+      order.payherePaymentId =
+        payment_id || null;
+
+      await order.save();
+    }
+
+    return res.status(200).send('OK');
+
+  } catch (error) {
+    console.error(
+      'PayHere notification error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .send('Server error');
+  }
+};
+
+// DEMO PAYMENT SUCCESS
+// University project demo only - no real money processed.
+
+exports.demoPayOrder = async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      orderNumber: req.params.orderNumber,
+      customer: req.user._id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    order.paymentMethod = 'payhere';
+    order.paymentStatus = 'paid';
+    order.payherePaymentId =
+      `DEMO-PAYHERE-${Date.now()}`;
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Demo payment successful',
+      order,
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Demo payment failed',
     });
   }
 };

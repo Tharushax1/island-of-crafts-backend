@@ -250,11 +250,44 @@ const orderSchema = new Schema({
     required: true,
     min: 0,
   },
-
-  paymentStatus: {
+  customerEmail: {
     type: String,
-    enum: ['pending', 'paid', 'failed', 'refunded'],
-    default: 'pending',
+    default: ''
+  },
+
+  paymentMethod: {
+    type: String,
+    enum: ['cash_on_delivery', 'payhere'],
+    default: 'cash_on_delivery'
+  },
+
+  paymentType: {
+    type: String,
+    enum: ['full', 'deposit', 'balance'],
+    default: 'full'
+  },
+
+  depositAmount: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+
+  balanceAmount: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+
+  payherePaymentId: {
+    type: String,
+    default: null
+  },
+
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'failed', 'refunded'],
+      default: 'pending',
   },
 
   status: {

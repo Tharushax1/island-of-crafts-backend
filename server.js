@@ -1,7 +1,9 @@
+const orderRoutes = require('./order.routes');
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const adminRoutes = require('./admin.routes');
 
 const productRoutes = require('./product.routes');
 const categoryRoutes = require('./category.routes');
@@ -12,6 +14,7 @@ const cartRoutes = require('./cart.routes');
 const app = express();
 app.use(cors()); // allows the React frontend (localhost:5173) to call this API
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ─── Routes ───
 app.use('/api/products', productRoutes);
@@ -19,6 +22,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api', artisanProfileRoutes);        // /api/artisan-profile, /api/storefront/:slug
 app.use('/api/custom-requests', customRequestRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => res.json({ status: 'Island of Crafts API running' }));
 
