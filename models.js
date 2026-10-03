@@ -7,14 +7,14 @@ const { Schema } = mongoose;
 // Management module) is merged in — this exists only so that
 // .populate('user'/'artisan'/'customer') doesn't crash for now.
 // ─────────────────────────────────────────────
-const userSchema = new Schema({
-  name: { type: String, default: 'Test User' },
-  role: { type: String, default: 'artisan' },
-}, { timestamps: true });
+// const userSchema = new Schema({
+//   name: { type: String, default: 'Test User' },
+//   role: { type: String, default: 'artisan' },
+// }, { timestamps: true });
 
-if (!mongoose.models.User) {
-  mongoose.model('User', userSchema);
-}
+// if (!mongoose.models.User) {
+//   mongoose.model('User', userSchema);
+// }
 
 // ─────────────────────────────────────────────
 // 1. CATEGORY
