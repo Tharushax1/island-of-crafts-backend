@@ -1,62 +1,108 @@
+
 const User = require('./user.model');
+const { Product, Order } = require('./models');
 
-//const User = require('./user.model');
-const { Product } = require('./models');
+// ======================================================
+// DASHBOARD STATISTICS
+// GET /api/admin/dashboard
+// ======================================================
 
-// GET ALL PENDING PRODUCTS
- // GET /api/admin/products/pending
-exports.getPendingProducts = async (req, res) => {
+exports.getDashboardStats = async (req, res) => {
   try {
-    const products = await Product.find({
-      status: 'pending',
-    })
-      .populate('category', 'name slug')
-      .populate('artisan', 'name email');
+    const totalProducts = await Product.countDocuments();
 
-    res.status(200).json({
-      count: products.length,
-      products,
+    const pendingProducts = await Product.countDocuments({
+      status: 'pending',
+    });
+
+    const totalArtisans = await User.countDocuments({
+      role: 'artisan',
+    });
+
+    const pendingArtisans = await User.countDocuments({
+      role: 'artisan',
+      artisanStatus: 'pending',
+    });
+
+    const totalOrders = await Order.countDocuments();
+
+    const paidOrders = await Order.countDocuments({
+      paymentStatus: 'paid',
+    });
+
+    const revenueResult = await Order.aggregate([
+      {
+        $match: {
+          paymentStatus: 'paid',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: {
+            $sum: '$total',
+          },
+        },
+      },
+    ]);
+
+    const totalRevenue =
+      revenueResult.length > 0
+        ? revenueResult[0].totalRevenue
+        : 0;
+
+    return res.status(200).json({
+      totalProducts,
+      pendingProducts,
+      totalArtisans,
+      pendingArtisans,
+      totalOrders,
+      paidOrders,
+      totalRevenue,
     });
   } catch (err) {
-    console.error('Get pending products error:', err);
+    console.error('Dashboard stats error:', err);
 
-    res.status(500).json({
-      message: 'Failed to fetch pending products',
+    return res.status(500).json({
+      message: 'Failed to load dashboard statistics',
       error: err.message,
     });
   }
 };
 
-// ─────────────────────────────────────────────
+// ======================================================
 // GET ALL PENDING ARTISANS
 // GET /api/admin/artisans/pending
-// ─────────────────────────────────────────────
+// ======================================================
+
 exports.getPendingArtisans = async (req, res) => {
   try {
     const artisans = await User.find({
       role: 'artisan',
       artisanStatus: 'pending',
-    }).select('-password');
+    })
+      .select('-password')
+      .sort({ createdAt: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
       count: artisans.length,
       artisans,
     });
   } catch (err) {
     console.error('Get pending artisans error:', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Failed to fetch pending artisans',
       error: err.message,
     });
   }
 };
 
-
-// ─────────────────────────────────────────────
+// ======================================================
 // APPROVE ARTISAN
 // PUT /api/admin/artisans/:id/approve
-// ─────────────────────────────────────────────
+// ======================================================
+
 exports.approveArtisan = async (req, res) => {
   try {
     const artisan = await User.findOne({
@@ -77,10 +123,9 @@ exports.approveArtisan = async (req, res) => {
     }
 
     artisan.artisanStatus = 'approved';
-
     await artisan.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Artisan approved successfully',
       artisan: {
         id: artisan._id,
@@ -93,18 +138,18 @@ exports.approveArtisan = async (req, res) => {
   } catch (err) {
     console.error('Approve artisan error:', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Failed to approve artisan',
       error: err.message,
     });
   }
 };
 
-
-// ─────────────────────────────────────────────
+// ======================================================
 // REJECT ARTISAN
 // PUT /api/admin/artisans/:id/reject
-// ─────────────────────────────────────────────
+// ======================================================
+
 exports.rejectArtisan = async (req, res) => {
   try {
     const artisan = await User.findOne({
@@ -125,10 +170,9 @@ exports.rejectArtisan = async (req, res) => {
     }
 
     artisan.artisanStatus = 'rejected';
-
     await artisan.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Artisan rejected successfully',
       artisan: {
         id: artisan._id,
@@ -141,8 +185,36 @@ exports.rejectArtisan = async (req, res) => {
   } catch (err) {
     console.error('Reject artisan error:', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Failed to reject artisan',
+      error: err.message,
+    });
+  }
+};
+
+// ======================================================
+// GET ALL PENDING PRODUCTS
+// GET /api/admin/products/pending
+// ======================================================
+
+exports.getPendingProducts = async (req, res) => {
+  try {
+    const products = await Product.find({
+      status: 'pending',
+    })
+      .populate('category', 'name slug')
+      .populate('artisan', 'name email')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      count: products.length,
+      products,
+    });
+  } catch (err) {
+    console.error('Get pending products error:', err);
+
+    return res.status(500).json({
+      message: 'Failed to fetch pending products',
       error: err.message,
     });
   }
